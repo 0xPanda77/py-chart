@@ -242,32 +242,78 @@ with st.sidebar:
 
     regular_hours_only = st.checkbox("Regular hours only (09:30–16:00 ET)", value=True)
 
+    st.divider()
+
+    # Streamlit reruns the script on every keystroke and toggle. Nothing is
+    # fetched until these settings are copied into session state by the button,
+    # so editing the sidebar never spends a rate-limited API call on its own.
+    pending = {
+        "provider": provider,
+        "symbol": symbol,
+        "day": day,
+        "sessions": int(sessions),
+        "tf_label": tf_label,
+        "feed": feed,
+        "regular_hours_only": regular_hours_only,
+    }
+
+    if st.button(
+        "Load chart",
+        type="primary",
+        use_container_width=True,
+        disabled=not (provider and symbol),
+    ):
+        st.session_state["request"] = pending
+
+    loaded = st.session_state.get("request")
+    if provider is None:
+        st.caption("Add a key above to enable loading.")
+    elif not symbol:
+        st.caption("Enter a ticker to enable loading.")
+    elif loaded is not None and loaded != pending:
+        st.caption("Settings changed — press Load chart to refresh.")
+
 
 # --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
 st.title("Intraday Chart")
 
-if provider is None:
-    st.info("Add a Massive or Alpaca key in the sidebar to get started.")
+request = st.session_state.get("request")
+if request is None:
+    st.info("Choose your settings in the sidebar, then press **Load chart**.")
     st.stop()
 
-if not symbol:
-    st.warning("Enter a ticker.")
+# Render from the snapshot, not the live widgets, so the chart and its
+# watermark keep matching the data until the button is pressed again.
+provider = request["provider"]
+symbol = request["symbol"]
+day = request["day"]
+sessions = request["sessions"]
+tf_label = request["tf_label"]
+feed = request["feed"]
+regular_hours_only = request["regular_hours_only"]
+
+has_creds = massive_key if provider == "massive" else (alpaca_key and alpaca_secret)
+if not has_creds:
+    st.warning(
+        f"No {PROVIDER_NAMES[provider]} credentials any more. Add the key in the "
+        "sidebar and press Load chart again."
+    )
     st.stop()
 
 try:
     with st.spinner(f"Fetching {symbol} from {PROVIDER_NAMES[provider]}…"):
         if provider == "massive":
             df = fetch_massive(
-                massive_key, symbol, day, int(sessions), tf_label, regular_hours_only
+                massive_key, symbol, day, sessions, tf_label, regular_hours_only
             )
         else:
             df = fetch_alpaca(
                 alpaca_client(alpaca_key, alpaca_secret),
                 symbol,
                 day,
-                int(sessions),
+                sessions,
                 tf_label,
                 feed,
                 regular_hours_only,
