@@ -74,8 +74,12 @@ secrets and type them into the sidebar per session.
 - **Timezone.** Massive returns `t` as Unix milliseconds; Alpaca returns UTC
   timestamps. Both are converted to America/New_York, so 09:30 on the chart is
   the real open.
-- **Chart timestamps.** Lightweight Charts needs epoch _seconds_ for intraday
-  series. Hand it a datetime string and it draws the grid and price scale but no
-  candles, silently. That conversion happens just before `chart.set()`.
+- **Chart timestamps.** Pass real datetimes to `chart.set()`, never epoch ints.
+  The library calls `pd.to_datetime()` on the column itself, and that reads a
+  bare int as nanoseconds — every bar lands on 1970-01-01.
 - **Today's data.** Massive's Basic plan is end-of-day, so the current session
   won't be complete. Use Alpaca or pick an earlier date.
+- **Sparse data and interval inference.** The library infers the bar interval
+  from the gaps between your timestamps. Irregularly spaced data (like Alpaca's
+  IEX feed on a thin ticker) can throw that off. Another reason to prefer
+  Massive.

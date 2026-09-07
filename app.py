@@ -293,16 +293,14 @@ c3.metric("Low", f"{df['low'].min():.2f}")
 c4.metric("Close", f"{last['close']:.2f}", f"{change:+.2f}%")
 c5.metric("Bars", f"{len(df):,}", coverage, delta_color="off")
 
-# Intraday series need epoch SECONDS. A "YYYY-MM-DD HH:MM:SS" string is only
-# valid for daily bars — pass one for minute data and the chart renders its
-# grid and price scale but draws no candles, with no error.
-chart_df = df.copy()
-chart_df["time"] = chart_df["time"].astype("int64") // 10**9
-
+# Pass datetimes, NOT epoch ints. The library runs pd.to_datetime() on this
+# column itself, and pd.to_datetime(1789000000) reads the int as nanoseconds,
+# which lands every bar on 1970-01-01.
 chart = StreamlitChart(width=900, height=600)
 chart.legend(visible=True)
 chart.watermark(f"{symbol}  ·  {day:%d %b %Y}")
-chart.set(chart_df)
+chart.set(df)
+chart.fit()
 chart.load()
 
 if provider == "alpaca" and feed == "iex":
