@@ -69,7 +69,12 @@ def finalize(df: pd.DataFrame, regular_hours_only: bool) -> pd.DataFrame:
         return pd.DataFrame()
 
     df = df.copy()
-    df["time"] = df["time"].dt.tz_localize(None)
+    # as_unit("ns") is load-bearing. lightweight-charts turns this column into
+    # epoch seconds with .astype("int64") // 10**9, which is only correct at
+    # nanosecond resolution. pandas keeps whatever unit it was handed, so
+    # pd.to_datetime(..., unit="ms") leaves a datetime64[ms] column and every
+    # bar collapses onto 1970-01-01.
+    df["time"] = df["time"].dt.tz_localize(None).dt.as_unit("ns")
     return (
         df[["time", "open", "high", "low", "close", "volume"]]
         .sort_values("time")
@@ -293,9 +298,7 @@ c3.metric("Low", f"{df['low'].min():.2f}")
 c4.metric("Close", f"{last['close']:.2f}", f"{change:+.2f}%")
 c5.metric("Bars", f"{len(df):,}", coverage, delta_color="off")
 
-# Pass datetimes, NOT epoch ints. The library runs pd.to_datetime() on this
-# column itself, and pd.to_datetime(1789000000) reads the int as nanoseconds,
-# which lands every bar on 1970-01-01.
+# The time column must be tz-naive datetime64[ns] — see finalize().
 chart = StreamlitChart(width=900, height=600)
 chart.legend(visible=True)
 chart.watermark(f"{symbol}  ·  {day:%d %b %Y}")

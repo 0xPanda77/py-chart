@@ -74,9 +74,14 @@ secrets and type them into the sidebar per session.
 - **Timezone.** Massive returns `t` as Unix milliseconds; Alpaca returns UTC
   timestamps. Both are converted to America/New_York, so 09:30 on the chart is
   the real open.
-- **Chart timestamps.** Pass real datetimes to `chart.set()`, never epoch ints.
-  The library calls `pd.to_datetime()` on the column itself, and that reads a
-  bare int as nanoseconds — every bar lands on 1970-01-01.
+- **Chart timestamps.** The `time` column handed to `chart.set()` must be
+  tz-naive **`datetime64[ns]`**. lightweight-charts converts it to epoch seconds
+  with `.astype("int64") // 10**9`, which is only correct at nanosecond
+  resolution. pandas 2+ keeps whatever unit it was given, so
+  `pd.to_datetime(t, unit="ms")` yields a `datetime64[ms]` column, that division
+  returns ~1789 instead of ~1.79e9, and every bar lands on 1970-01-01 — while
+  the raw data table still shows perfect dates. `finalize()` pins the unit with
+  `.dt.as_unit("ns")`.
 - **Today's data.** Massive's Basic plan is end-of-day, so the current session
   won't be complete. Use Alpaca or pick an earlier date.
 - **Sparse data and interval inference.** The library infers the bar interval
