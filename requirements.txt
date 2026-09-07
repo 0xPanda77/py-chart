@@ -1,0 +1,4 @@
+streamlit>=1.40
+lightweight-charts>=2.1
+alpaca-py>=0.33
+pandas>=2.0
