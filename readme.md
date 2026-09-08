@@ -82,6 +82,14 @@ secrets and type them into the sidebar per session.
   returns ~1789 instead of ~1.79e9, and every bar lands on 1970-01-01 — while
   the raw data table still shows perfect dates. `finalize()` pins the unit with
   `.dt.as_unit("ns")`.
+- **Autofill.** Keys are meant to be typed per session on the deployed app so
+  each visitor spends their own rate limit, which makes the sidebar boxes the
+  main way in. Streamlit is React and keeps its own copy of every widget value,
+  so a password manager assigning to `input.value` fills the box without the
+  server ever seeing it and Load chart stays disabled. `AUTOFILL_SYNC` in
+  `app.py` resets React's `_valueTracker` and replays `input` plus `focusout`
+  so the value reaches the server. It leaves focused fields alone so it cannot
+  interrupt typing.
 - **Today's data.** Massive's Basic plan is end-of-day, so the current session
   won't be complete. Use Alpaca or pick an earlier date.
 - **Sparse data and interval inference.** The library infers the bar interval

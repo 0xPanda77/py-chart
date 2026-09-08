@@ -13,6 +13,7 @@ import datetime as dt
 import pandas as pd
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from lightweight_charts.widgets import StreamlitChart
 
 from alpaca.data.enums import Adjustment, DataFeed
@@ -51,6 +52,55 @@ def load_secret(name: str) -> str:
         return st.secrets.get(name, "")
     except Exception:
         return ""
+
+
+# Keys are deliberately NOT baked into secrets on the deployed app — every
+# visitor types their own so they spend their own rate limit. That makes the
+# sidebar password boxes the main way in, and they have to survive autofill.
+#
+# Streamlit's frontend is React, which keeps its own copy of each input's value
+# and a _valueTracker used to decide whether an input event is a real change.
+# A password manager that assigns to input.value goes through React's setter,
+# so the tracker updates but no change event is ever raised: the box looks
+# filled while the server still holds "". Resetting the tracker before
+# dispatching makes React see the difference and run its onChange.
+#
+# Streamlit then only sends the value to the server on blur or Enter, so an
+# unfocused field also needs a synthetic focusout. That is dispatched on a
+# later tick to give React time to flush the state update from onChange.
+AUTOFILL_SYNC = """
+<script>
+(function () {
+  var doc = window.parent.document;
+  var seen = new WeakMap();
+
+  function replay(el) {
+    if (el._valueTracker) el._valueTracker.setValue("");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  // focusout only. React maps it to onBlur, which is what Streamlit commits
+  // on. Sending an Enter keydown as well double-fires: React has not flushed
+  // the state update from the first commit before the second event arrives.
+  function commit(el) {
+    el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+  }
+
+  setInterval(function () {
+    doc.querySelectorAll('input[type="password"]').forEach(function (el) {
+      if (seen.get(el) === el.value) return;
+      seen.set(el, el.value);
+      if (!el.value) return;
+      replay(el);
+      // A focused field means the user is mid-edit; their own blur will
+      // commit it. Only push unfocused fields, which is the autofill case.
+      if (el !== doc.activeElement) setTimeout(function () { commit(el); }, 0);
+    });
+  }, 400);
+})();
+</script>
+"""
 
 
 # --------------------------------------------------------------------------
@@ -197,6 +247,7 @@ with st.sidebar:
         with st.expander("Alpaca keys"):
             alpaca_key = st.text_input("API key ID", type="password", key="ak_in")
             alpaca_secret = st.text_input("Secret key", type="password", key="as_in")
+        components.html(AUTOFILL_SYNC, height=0)
 
     # Massive first — it's the better source, so it wins the default.
     available = []
