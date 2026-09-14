@@ -18,3 +18,7 @@ env/
 .DS_Store
 .vscode/
 .idea/
+
+# Next.js app (web/) — see web/.gitignore for the rest
+node_modules/
+.next/
